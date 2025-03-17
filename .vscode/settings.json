@@ -1,0 +1,16 @@
+{
+   "workspaceFolder": {
+   "path": ".",
+   "zephyrproject": "%HOMEPATH%/zephyrproject",
+   "AppUnderDev": "${workspaceRoot}"
+   },
+"bsp": {
+   "board": "stm32f4_disco",
+   //"board": "stm32l1_disco",
+   //"board": "lpcxpresso11u68",
+ },
+ "app": {
+   "name": "${config:workspaceFolder.AppUnderDev}",
+   "build_dir": "${config:workspaceFolder.AppUnderDev}\\build",
+   },
+}
