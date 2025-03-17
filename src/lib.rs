@@ -10,8 +10,11 @@
 
 use log::warn;
 
-use zephyr::raw::GPIO_OUTPUT_ACTIVE;
 use zephyr::time::{sleep, Duration};
+
+use zephyr::{
+    raw::{GPIO_INPUT, GPIO_OUTPUT_ACTIVE, GPIO_PULL_DOWN},
+};
 
 #[no_mangle]
 extern "C" fn rust_main() {
@@ -29,6 +32,7 @@ fn do_blink() {
     warn!("Inside of blinky");
 
     let mut led0 = zephyr::devicetree::aliases::led0::get_instance().unwrap();
+    let mut button = zephyr::devicetree::labels::button::get_instance().unwrap();
     let mut gpio_token = unsafe { zephyr::device::gpio::GpioToken::get_instance().unwrap() };
 
     if !led0.is_ready() {
@@ -38,13 +42,20 @@ fn do_blink() {
 
     unsafe {
         led0.configure(&mut gpio_token, GPIO_OUTPUT_ACTIVE);
+        button.configure(&mut gpio_token, GPIO_INPUT | GPIO_PULL_DOWN);
     }
     let duration = Duration::millis_at_least(500);
     loop {
         unsafe {
             led0.toggle_pin(&mut gpio_token);
         }
-        sleep(duration);
+
+        if unsafe { button.get(&mut gpio_token) } == true {
+           sleep(duration / 10);
+        } else {
+            sleep(duration);
+        }
+        
     }
 }
 
