@@ -1,9 +1,13 @@
 / {
 	gpios {
 		compatible = "gpio-leds";
+		led: led {
+			gpios = <&gpiod 14 GPIO_ACTIVE_HIGH>;
+			label = "red led";
+		};
 		button: button {
 			gpios = <&gpioa 0 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>;
-			label = "User Button";
+			label = "Row 0";
 		};
-	};
+	};	
 };
