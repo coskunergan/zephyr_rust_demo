@@ -16,7 +16,6 @@ use embassy_time::{Duration, Ticker};
 
 use zephyr::{
     //device::gpio::{GpioPin, GpioToken},
-    kio::{yield_now},
     embassy::Executor,
     raw::{GPIO_INPUT, GPIO_OUTPUT_ACTIVE, GPIO_PULL_DOWN},
 };
@@ -60,21 +59,19 @@ async fn main(spawner: Spawner) {
         led.configure(&mut gpio_token, GPIO_OUTPUT_ACTIVE);
         button.configure(&mut gpio_token, GPIO_INPUT | GPIO_PULL_DOWN);
     }
-    //let duration = Duration::millis_at_least(500);
+
+    let mut debounce = Ticker::every(Duration::from_millis(10));
+
     loop {
 
         unsafe { button.wait_for_high(&mut gpio_token).await };
+
+        debounce.next().await;
         
         unsafe { button.wait_for_low(&mut gpio_token).await };
+
+        debounce.next().await;
         
         unsafe { led.toggle_pin(&mut gpio_token); }
-        
-        // if unsafe { button.get(&mut gpio_token) } == true {
-        //      sleep(duration);
-        //      let mut ticker = Ticker::every(Duration::from_millis(1));
-        //      ticker.next().await;
-        // }
-
-        yield_now().await;
     }
 }
