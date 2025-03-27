@@ -6,6 +6,7 @@
    },
 "bsp": {
    "board": "stm32f4_disco",
+   //"board": "rpi_pico",
    //"board": "stm32l1_disco",
    //"board": "lpcxpresso11u68",
  },
