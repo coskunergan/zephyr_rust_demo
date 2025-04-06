@@ -3,8 +3,12 @@
 		compatible = "gpio-leds";
 		led: led {
 			gpios = <&gpiod 12 GPIO_ACTIVE_HIGH>;
-			label = "red led";
+			label = "red green";
 		};
+		led_red: led_red {
+			gpios = <&gpiod 13 GPIO_ACTIVE_HIGH>;
+			label = "red led";
+		};		
 		button: button {
 			gpios = <&gpioa 0 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>;
 			label = "Row 0";
