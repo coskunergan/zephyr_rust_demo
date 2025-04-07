@@ -1,4 +1,4 @@
-use embassy_time::{Duration, Instant, Timer};
+use embassy_time::{Duration, Timer};
 
 use zephyr::{
     raw::GPIO_OUTPUT_ACTIVE,
@@ -7,17 +7,15 @@ use zephyr::{
 
 use super::{GpioPin, GpioToken};
 
-use log::info;
-
 pub struct Led {
+    token: Arc<Mutex<GpioToken>>,
     pin: GpioPin,
     delay: Duration,
-    token: Arc<Mutex<GpioToken>>,
 }
 
 impl Led {
-    pub fn new(pin: GpioPin, delay: Duration, token: Arc<Mutex<GpioToken>>) -> Self {
-        Self { pin, delay, token }
+    pub fn new(token: Arc<Mutex<GpioToken>>, pin: GpioPin, delay: Duration) -> Self {
+        Self { token, pin, delay }
     }
 
     pub async fn blinky(&mut self) {
@@ -31,7 +29,6 @@ impl Led {
             unsafe {
                 self.pin.toggle_pin(&mut token_lock);
             }
-
             Timer::after(self.delay).await;
         }
     }
@@ -52,7 +49,7 @@ macro_rules! declare_leds {
             $(
                 let pin = $pin;
                 let delay = $delay;
-                let mut led = $crate::led::Led::new(pin, delay, $token.clone());
+                let led = $crate::led::Led::new($token.clone(), pin, delay);
                 match $spawner.spawn(led_task(led)) {
                     Ok(_) => log::info!("LED gorevi baslatildi."),
                     Err(e) => log::error!("LED gorevi baslatilamadi: {:?}", e),
