@@ -5,6 +5,6 @@ fn main() {
     // ```rust
     // #[cfg(dt = "aliases::led0")]
     // ```
-		
+
     zephyr_build::dt_cfgs();
 }

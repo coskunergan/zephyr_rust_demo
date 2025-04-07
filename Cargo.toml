@@ -31,6 +31,15 @@ version = "1.2"
 version = "0.4.0"
 features = ["tick-hz-10_000"]
 
+[features]
+default = ["executor-thread"]
+# default = ["executor-zephyr"]
+
+executor-thread = [
+  "embassy-executor/arch-cortex-m",
+  "embassy-executor/executor-thread",
+]
+
 [dependencies.embassy-executor]
 version = "0.7.0"
 features = [
