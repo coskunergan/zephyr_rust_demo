@@ -29,11 +29,13 @@ use embassy_sync::signal::Signal;
 use static_cell::StaticCell;
 
 mod button;
+mod encoder;
 mod led;
 
 static EXECUTOR_MAIN: StaticCell<Executor> = StaticCell::new();
 
 pub static BUTTON_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
+pub static ENCODER_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
 
 //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
@@ -55,26 +57,23 @@ extern "C" fn rust_main() {
 #[embassy_executor::task]
 async fn main(spawner: Spawner) {
     let gpio_token = Arc::new(Mutex::new(unsafe { GpioToken::get_instance().unwrap() }));
-    log::info!("GPIO token olusturuldu");
-
-    let led_green = zephyr::devicetree::labels::led::get_instance().unwrap();
     let led_red = zephyr::devicetree::labels::led_red::get_instance().unwrap();
-
-    log::info!("LED pinleri alindi: led_green ve led_red");
+    let led_green = zephyr::devicetree::labels::led_green::get_instance().unwrap();
+    let led_blue = zephyr::devicetree::labels::led_blue::get_instance().unwrap();
+    let led_orange = zephyr::devicetree::labels::led_orange::get_instance().unwrap();
 
     declare_leds!(
         spawner,
         gpio_token,
         [
-            (led_green, Duration::from_millis(100)),
-            (led_red, Duration::from_millis(500))
+            (led_red, Duration::from_millis(100)),
+            (led_green, Duration::from_millis(200)),
+            (led_blue, Duration::from_millis(400)),
+            (led_orange, Duration::from_millis(600))
         ]
     );
-    log::info!("LED'ler baslatildi");
 
     let button = zephyr::devicetree::labels::button::get_instance().unwrap();
-
-    log::info!("Button Pini Alindi.");
 
     declare_buttons!(
         spawner,
@@ -82,18 +81,39 @@ async fn main(spawner: Spawner) {
         [(
             button,
             || {
-                log::info!("Butona Basildi!");
+                log::info!("Button Pressed!");
                 BUTTON_SIGNAL.signal(true);
             },
             Duration::from_millis(100)
         )]
     );
-    log::info!("Button'lar baslatildi");
 
+    let encoder_a = zephyr::devicetree::labels::encoder_a::get_instance().unwrap();
+    let encoder_b = zephyr::devicetree::labels::encoder_b::get_instance().unwrap();
+
+    declare_encoders!(
+        spawner,
+        gpio_token,
+        [(
+            encoder_a,
+            encoder_b,
+            |clockwise| {
+                ENCODER_SIGNAL.signal(clockwise);
+            },
+            Duration::from_millis(5)
+        )]
+    );
+
+    Timer::after(Duration::from_millis(100)).await;
+
+    let mut count = 0;
     loop {
-        Timer::after(Duration::from_millis(1000)).await;
-        let val = BUTTON_SIGNAL.wait().await;
-        log::info!("Button yakalandi. val: {}", val);
+        if ENCODER_SIGNAL.wait().await as bool {
+            count += 1;
+        } else {
+            count -= 1;
+        }
+        log::info!("Encoder Value: {}", count);
     }
 }
 //////////////////////////////////////////////////////////////////////////////////

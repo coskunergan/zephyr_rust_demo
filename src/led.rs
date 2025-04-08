@@ -6,6 +6,7 @@ use zephyr::{
 };
 
 use super::{GpioPin, GpioToken};
+use log::warn;
 
 pub struct Led {
     token: Arc<Mutex<GpioToken>>,
@@ -20,6 +21,11 @@ impl Led {
 
     pub async fn blinky(&mut self) {
         let mut token_lock = self.token.lock().unwrap();
+
+        if !self.pin.is_ready() {
+            warn!("LED pin is not ready");
+            loop {}
+        }
 
         unsafe {
             self.pin.configure(&mut token_lock, GPIO_OUTPUT_ACTIVE);
@@ -39,7 +45,7 @@ macro_rules! declare_leds {
     ($spawner:expr, $token:expr, [ $( ($pin:expr, $delay:expr) ),* ]) => {
         {
             const LED_COUNT: usize = 0 $( + { let _ = ($delay); 1 } )*;
-            log::info!("Deklare edilen LED sayisi: {}", LED_COUNT);
+            log::info!("Declared LED count: {}", LED_COUNT);
 
             #[embassy_executor::task(pool_size = LED_COUNT)]
             async fn led_task(mut led: crate::led::Led) {
@@ -51,8 +57,8 @@ macro_rules! declare_leds {
                 let delay = $delay;
                 let led = $crate::led::Led::new($token.clone(), pin, delay);
                 match $spawner.spawn(led_task(led)) {
-                    Ok(_) => log::info!("LED gorevi baslatildi."),
-                    Err(e) => log::error!("LED gorevi baslatilamadi: {:?}", e),
+                    Ok(_) => log::info!("LED task started."),
+                    Err(e) => log::error!("LED task failure: {:?}", e),
                 }
             )*
         }
