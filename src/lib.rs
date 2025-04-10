@@ -1,5 +1,6 @@
-// Copyright (c) 2024 Linaro LTD
+// Copyright (c) 2025
 // SPDX-License-Identifier: Apache-2.0
+// Coskun ERGAN
 
 #![no_std]
 // Sigh. The check config system requires that the compiler be told what possible config values
@@ -7,22 +8,30 @@
 // whole point is that we likely need to check for configs that aren't otherwise present in the
 // build.  So, this is just always necessary.
 
-//#![allow(unexpected_cfgs)]
 //#![allow(warnings)]
 
-//use log::warn;
 extern crate alloc;
 
 use embassy_time::{Duration, Timer};
 
 use alloc::boxed::Box;
 
+use crate::raw::__device_dts_ord_16;
+use crate::raw::auxdisplay_write;
+
+use zephyr::raw;
+
+#[cfg(feature = "executor-thread")]
+use embassy_executor::Executor;
+
+#[cfg(feature = "executor-zephyr")]
+use zephyr::embassy::Executor;
+
 use zephyr::{
     device::gpio::{GpioPin, GpioToken},
     sync::{Arc, Mutex},
 };
 
-use embassy_executor::Executor;
 use embassy_executor::Spawner;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
@@ -105,6 +114,24 @@ async fn main(spawner: Spawner) {
     );
 
     Timer::after(Duration::from_millis(100)).await;
+
+    //let lcd_device = unsafe { zephyr::devicetree::labels::auxdisplay_0::get_instance_raw() };
+    //let lcd_device = unsafe { zephyr::devicetree::labels::aux_display_gpio::get_instance_raw() }; /*__device_dts_ord_15 */
+    let lcd_device = unsafe { &__device_dts_ord_16 as *const crate::raw::device };
+
+    let message = "coskunergan.dev";
+
+    let rc = unsafe {
+        auxdisplay_write(
+            lcd_device,
+            message.as_ptr(),
+            message.len().try_into().unwrap(),
+        )
+    };
+
+    if rc != 0 {
+        log::warn!("Failed to lcd write {}", rc);
+    }
 
     let mut count = 0;
     loop {

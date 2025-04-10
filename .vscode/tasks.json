@@ -7,6 +7,7 @@
 			"group": "build",
 			"command": "west",
 			"args": [
+				//"-v",
 				"build",				
 				"-p",
 				"auto",

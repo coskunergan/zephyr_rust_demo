@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Zephyr STM32F4 Debug",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/zephyr/zephyr.elf",
+            "device": "STM32F407VG", // Kullandığınız STM32F4 modeline göre değiştirin (ör. STM32F407VG)
+            "interface": "swd",
+            "configFiles": [
+                "interface/stlink.cfg", // ST-Link için arabirim dosyası
+                "target/stm32f4x.cfg"   // STM32F4 hedef dosyası
+            ],
+            "searchDir": [
+                "/usr/share/openocd/scripts" // OpenOCD scriptlerinin bulunduğu dizin (sisteminize göre değiştirin)
+            ],
+            "svdFile": "${workspaceFolder}/STM32F407.svd", // SVD dosyasının yolu (isteğe bağlı, hata ayıklama için register bilgisi sağlar)
+            "runToEntryPoint": "main", // Programı main fonksiyonuna kadar çalıştırır
+            "preLaunchTask": "build", // Hata ayıklamadan önce derleme görevi (tasks.json'da tanımlı olmalı)
+            "openOCDLaunchCommands": [
+                "init",
+                "reset init"
+            ]
+        }
+    ]
+}
