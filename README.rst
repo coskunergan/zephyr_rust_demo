@@ -23,4 +23,7 @@ Your board must:
 #. Have an encoder connected via a GPIO pins.
 #. Have an lcd module must be connected to the ``i2cx`` pins.
 
- ![alt text](img/lcd_module.png) 
+
+.. image:: img/lcd_module.png
+   :alt: LCD Module
+
