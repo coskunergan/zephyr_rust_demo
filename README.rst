@@ -26,4 +26,6 @@ Your board must:
 
 .. image:: img/lcd_module.png
    :alt: LCD Module
+   :width: 300px
+   :height: 300px
 
