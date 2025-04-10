@@ -1,12 +1,8 @@
 // Copyright (c) 2025
 // SPDX-License-Identifier: Apache-2.0
-// Coskun ERGAN
+// Coskun ERGAN <coskunergan@gmail.com>
 
 #![no_std]
-// Sigh. The check config system requires that the compiler be told what possible config values
-// there might be.  This is completely impossible with both Kconfig and the DT configs, since the
-// whole point is that we likely need to check for configs that aren't otherwise present in the
-// build.  So, this is just always necessary.
 
 //#![allow(warnings)]
 
@@ -15,11 +11,7 @@ extern crate alloc;
 use embassy_time::{Duration, Timer};
 
 use alloc::boxed::Box;
-
-use crate::raw::__device_dts_ord_16;
-use crate::raw::auxdisplay_write;
-
-use zephyr::raw;
+use alloc::format;
 
 #[cfg(feature = "executor-thread")]
 use embassy_executor::Executor;
@@ -29,6 +21,7 @@ use zephyr::embassy::Executor;
 
 use zephyr::{
     device::gpio::{GpioPin, GpioToken},
+    raw,
     sync::{Arc, Mutex},
 };
 
@@ -37,18 +30,20 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
 use static_cell::StaticCell;
 
+use crate::raw::__device_dts_ord_16;
+use crate::raw::auxdisplay_backlight_set;
+use crate::raw::auxdisplay_clear;
+use crate::raw::auxdisplay_write;
+
 mod button;
 mod encoder;
 mod led;
 
 static EXECUTOR_MAIN: StaticCell<Executor> = StaticCell::new();
-
 pub static BUTTON_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
 pub static ENCODER_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
+static mut BL_STATE: bool = false;
 
-//////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////
 #[no_mangle]
 extern "C" fn rust_main() {
     unsafe {
@@ -60,9 +55,7 @@ extern "C" fn rust_main() {
         spawner.spawn(main(spawner)).unwrap();
     })
 }
-//////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////// MAIN //////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////
+
 #[embassy_executor::task]
 async fn main(spawner: Spawner) {
     let gpio_token = Arc::new(Mutex::new(unsafe { GpioToken::get_instance().unwrap() }));
@@ -91,6 +84,13 @@ async fn main(spawner: Spawner) {
             button,
             || {
                 log::info!("Button Pressed!");
+                unsafe {
+                    auxdisplay_backlight_set(&__device_dts_ord_16, {
+                        BL_STATE = !BL_STATE;
+                        BL_STATE as u8
+                    });
+                };
+
                 BUTTON_SIGNAL.signal(true);
             },
             Duration::from_millis(100)
@@ -115,34 +115,28 @@ async fn main(spawner: Spawner) {
 
     Timer::after(Duration::from_millis(100)).await;
 
-    //let lcd_device = unsafe { zephyr::devicetree::labels::auxdisplay_0::get_instance_raw() };
-    //let lcd_device = unsafe { zephyr::devicetree::labels::aux_display_gpio::get_instance_raw() }; /*__device_dts_ord_15 */
     let lcd_device = unsafe { &__device_dts_ord_16 as *const crate::raw::device };
 
-    let message = "coskunergan.dev";
-
-    let rc = unsafe {
-        auxdisplay_write(
-            lcd_device,
-            message.as_ptr(),
-            message.len().try_into().unwrap(),
-        )
-    };
+    let rc = unsafe { auxdisplay_backlight_set(lcd_device, 1) };
 
     if rc != 0 {
         log::warn!("Failed to lcd write {}", rc);
     }
 
-    let mut count = 0;
+    let mut value = 0;
     loop {
+        unsafe { auxdisplay_clear(lcd_device) };
+
+        let msg = format!("Encoder Val: {}", value);
+
+        unsafe { auxdisplay_write(lcd_device, msg.as_ptr(), msg.len().try_into().unwrap()) };
+
         if ENCODER_SIGNAL.wait().await as bool {
-            count += 1;
+            value += 1;
         } else {
-            count -= 1;
+            value -= 1;
         }
-        log::info!("Encoder Value: {}", count);
+
+        log::info!("Encoder Value: {}", value);
     }
 }
-//////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////

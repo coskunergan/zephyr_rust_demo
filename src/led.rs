@@ -1,3 +1,7 @@
+// Copyright (c) 2025
+// SPDX-License-Identifier: Apache-2.0
+// Coskun ERGAN <coskunergan@gmail.com>
+
 use embassy_time::{Duration, Timer};
 
 use zephyr::{
