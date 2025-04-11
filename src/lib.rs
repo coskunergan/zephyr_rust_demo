@@ -3,7 +3,6 @@
 // Coskun ERGAN <coskunergan@gmail.com>
 
 #![no_std]
-
 //#![allow(warnings)]
 
 extern crate alloc;
@@ -20,25 +19,22 @@ use embassy_executor::Executor;
 use zephyr::embassy::Executor;
 
 use zephyr::{
-    raw,
     device::gpio::{GpioPin, GpioToken},
+    raw,
+    raw::device,
     sync::{Arc, Mutex},
 };
 
+use core::{sync::atomic::AtomicI32, sync::atomic::Ordering};
 use embassy_executor::Spawner;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
 use static_cell::StaticCell;
 
-use crate::raw::__device_dts_ord_16;
 use crate::raw::auxdisplay_backlight_set;
 use crate::raw::auxdisplay_clear;
 use crate::raw::auxdisplay_write;
-
-use core::{
-    sync::atomic::Ordering,
-    sync::atomic::AtomicI32,
-};
+use crate::raw::device_get_binding;
 
 mod button;
 mod encoder;
@@ -49,6 +45,7 @@ pub static BUTTON_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
 pub static ENCODER_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
 static mut BL_STATE: bool = false;
 static COUNT: AtomicI32 = AtomicI32::new(0);
+static mut LCD_DEVICE: *const device = core::ptr::null();
 
 #[no_mangle]
 extern "C" fn rust_main() {
@@ -91,7 +88,7 @@ async fn main(spawner: Spawner) {
             || {
                 log::info!("Button Pressed!");
                 unsafe {
-                    auxdisplay_backlight_set(&__device_dts_ord_16, {
+                    auxdisplay_backlight_set(LCD_DEVICE, {
                         BL_STATE = !BL_STATE;
                         BL_STATE as u8
                     });
@@ -114,35 +111,33 @@ async fn main(spawner: Spawner) {
             encoder_b,
             |clockwise| {
                 let mut value = COUNT.load(Ordering::SeqCst);
-                if clockwise 
-                {
-                    value +=1;
-                }
-                else
-                {
-                    value -=1;
+                if clockwise {
+                    value += 1;
+                } else {
+                    value -= 1;
                 }
                 COUNT.store(value, Ordering::Release);
-                ENCODER_SIGNAL.signal(clockwise);                
+                ENCODER_SIGNAL.signal(clockwise);
             },
             Duration::from_millis(1)
         )]
-    );    
+    );
 
-    let lcd_device = unsafe { &__device_dts_ord_16 as *const crate::raw::device };
+    unsafe {
+        LCD_DEVICE = device_get_binding(c"hd44780".as_ptr() as *const core::ffi::c_char);
+    }
 
     loop {
-
-        Timer::after(Duration::from_millis(100)).await;
-
-        unsafe { auxdisplay_clear(lcd_device) };
+        unsafe { auxdisplay_clear(LCD_DEVICE) };
 
         let msg = format!("Encoder: {}", COUNT.load(Ordering::SeqCst));
 
-        unsafe { auxdisplay_write(lcd_device, msg.as_ptr(), msg.len().try_into().unwrap()) };
-        
-        log::info!("{}",msg);
+        unsafe { auxdisplay_write(LCD_DEVICE, msg.as_ptr(), msg.len().try_into().unwrap()) };
 
-        ENCODER_SIGNAL.wait().await;        
+        log::info!("{}", msg);
+
+        Timer::after(Duration::from_millis(30)).await;
+
+        ENCODER_SIGNAL.wait().await;
     }
 }
