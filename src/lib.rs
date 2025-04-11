@@ -20,8 +20,8 @@ use embassy_executor::Executor;
 use zephyr::embassy::Executor;
 
 use zephyr::{
-    device::gpio::{GpioPin, GpioToken},
     raw,
+    device::gpio::{GpioPin, GpioToken},
     sync::{Arc, Mutex},
 };
 
@@ -35,6 +35,11 @@ use crate::raw::auxdisplay_backlight_set;
 use crate::raw::auxdisplay_clear;
 use crate::raw::auxdisplay_write;
 
+use core::{
+    sync::atomic::Ordering,
+    sync::atomic::AtomicI32,
+};
+
 mod button;
 mod encoder;
 mod led;
@@ -43,6 +48,7 @@ static EXECUTOR_MAIN: StaticCell<Executor> = StaticCell::new();
 pub static BUTTON_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
 pub static ENCODER_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
 static mut BL_STATE: bool = false;
+static COUNT: AtomicI32 = AtomicI32::new(0);
 
 #[no_mangle]
 extern "C" fn rust_main() {
@@ -68,9 +74,9 @@ async fn main(spawner: Spawner) {
         spawner,
         gpio_token,
         [
-            (led_red, Duration::from_millis(100)),
-            (led_green, Duration::from_millis(200)),
-            (led_blue, Duration::from_millis(400)),
+            (led_red, Duration::from_millis(75)),
+            (led_green, Duration::from_millis(150)),
+            (led_blue, Duration::from_millis(300)),
             (led_orange, Duration::from_millis(600))
         ]
     );
@@ -107,36 +113,36 @@ async fn main(spawner: Spawner) {
             encoder_a,
             encoder_b,
             |clockwise| {
-                ENCODER_SIGNAL.signal(clockwise);
+                let mut value = COUNT.load(Ordering::SeqCst);
+                if clockwise 
+                {
+                    value +=1;
+                }
+                else
+                {
+                    value -=1;
+                }
+                COUNT.store(value, Ordering::Release);
+                ENCODER_SIGNAL.signal(clockwise);                
             },
-            Duration::from_millis(5)
+            Duration::from_millis(1)
         )]
-    );
-
-    Timer::after(Duration::from_millis(100)).await;
+    );    
 
     let lcd_device = unsafe { &__device_dts_ord_16 as *const crate::raw::device };
 
-    let rc = unsafe { auxdisplay_backlight_set(lcd_device, 1) };
-
-    if rc != 0 {
-        log::warn!("Failed to lcd write {}", rc);
-    }
-
-    let mut value = 0;
     loop {
+
+        Timer::after(Duration::from_millis(100)).await;
+
         unsafe { auxdisplay_clear(lcd_device) };
 
-        let msg = format!("Encoder Val: {}", value);
+        let msg = format!("Encoder: {}", COUNT.load(Ordering::SeqCst));
 
         unsafe { auxdisplay_write(lcd_device, msg.as_ptr(), msg.len().try_into().unwrap()) };
+        
+        log::info!("{}",msg);
 
-        if ENCODER_SIGNAL.wait().await as bool {
-            value += 1;
-        } else {
-            value -= 1;
-        }
-
-        log::info!("Encoder Value: {}", value);
+        ENCODER_SIGNAL.wait().await;        
     }
 }

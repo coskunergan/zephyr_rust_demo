@@ -13,7 +13,6 @@
 	};
 };
 
-
 / {
 	gpios {
 		compatible = "gpio-leds";
