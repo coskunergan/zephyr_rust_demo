@@ -20,6 +20,8 @@ Your board must:
 4. Have an LCD module connected to the `i2cx` pins.
 
 
-![LCD Module](img/lcd_module.png){:.width-300}
+ <img src="img/lcd_module.png" alt="LCD Module" width="300">
+
+# Demo
 
 ![Prj Demo](img/demo.gif)
