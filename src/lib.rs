@@ -39,6 +39,8 @@ use crate::raw::device_get_binding;
 mod button;
 mod encoder;
 mod led;
+mod adc_io;
+//let dev = unsafe { raw::device_get_binding(c"adc@40012000".as_ptr() as *const core::ffi::c_char) };            
 
 static EXECUTOR_MAIN: StaticCell<Executor> = StaticCell::new();
 pub static BUTTON_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
@@ -66,6 +68,23 @@ async fn main(spawner: Spawner) {
     let led_green = zephyr::devicetree::labels::led_green::get_instance().unwrap();
     let led_blue = zephyr::devicetree::labels::led_blue::get_instance().unwrap();
     let led_orange = zephyr::devicetree::labels::led_orange::get_instance().unwrap();
+
+    ///////////////////////////
+    
+    let mut adc = adc_io::Adc::new();
+
+    // adc.read_async(
+    //     core::time::Duration::from_millis(500),
+    //     Some(|idx, value| {
+    //         zephyr::printk!("ADC Channel {}: {}\n", idx, value);
+    //         //unsafe { auxdisplay_clear(LCD_DEVICE) };
+    //         //let msg = format!("ADC {}: {}\n", idx, value);
+    //         //unsafe { auxdisplay_write(LCD_DEVICE, msg.as_ptr(), msg.len().try_into().unwrap()) };            
+    //     }),
+    // );
+
+
+    ////////////////////////////
 
     declare_leds!(
         spawner,
@@ -95,7 +114,7 @@ async fn main(spawner: Spawner) {
                 };
 
                 BUTTON_SIGNAL.signal(true);
-            },
+            }, 
             Duration::from_millis(100)
         )]
     );
