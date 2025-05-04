@@ -8,7 +8,8 @@ use core::time::Duration;
 use zephyr::{printk, raw};
 use zephyr::raw::k_work_init;
 use crate::raw::device_get_binding;
-
+//use crate::raw::__BindgenBitfieldUnit;
+use zephyr::raw::__BindgenBitfieldUnit;
 // ---- `adc_dt_spec` için NEWTYPE SARICI ----
 #[repr(transparent)]
 pub struct AdcDtSpecWrapper(pub raw::adc_dt_spec);
@@ -36,12 +37,12 @@ static ADC_CHANNELS_TEMPLATE: &[AdcDtSpecWrapper] = &[
             gain: 0,
             reference: 0,
             acquisition_time: 0,
-            _bitfield_align_1: [0; 0],
-            _bitfield_1: raw::__BindgenBitfieldUnit::new([0]),
-            __bindgen_padding_0: 0,
+            _bitfield_align_1: [], // Boş bırakılır
+            _bitfield_1: __BindgenBitfieldUnit::new([0b00001010u8; 1]),
+            __bindgen_padding_0: 0, // Padding sıfır  
         },
-        channel_cfg_dt_node_exists: false,
-        channel_id: 0,
+        channel_cfg_dt_node_exists: true,
+        channel_id: 10,
         oversampling: 0,
         vref_mv: 3300,
         resolution: 12,

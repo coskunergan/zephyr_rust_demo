@@ -1,3 +1,4 @@
+#include "stm32f4_disco.dtsi"
 
 &i2c2 {
 	pinctrl-0 = <&i2c2_scl_pb10 &i2c2_sda_pb11>;
@@ -10,19 +11,6 @@
 		gpio-controller;
 		ngpios = <8>;
 		#gpio-cells = <2>;
-	};
-};
-
-&adc1 {
-	#address-cells = <1>;
-	#size-cells = <0>;
- 
-	channel@10 {
-		reg = <10>;
-		zephyr,gain = "ADC_GAIN_1";
-		zephyr,reference = "ADC_REF_INTERNAL";
-		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
-		zephyr,resolution = <12>;
 	};
 };
 
@@ -94,3 +82,15 @@
 	};	
 };
 
+&adc1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+ 
+	channel@10 {
+		reg = <10>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+	};
+};
