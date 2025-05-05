@@ -7,15 +7,10 @@ use core::time::Duration;
 
 use zephyr::{printk, raw};
 use zephyr::raw::k_work_init;
-use crate::raw::device_get_binding;
-//use crate::raw::__BindgenBitfieldUnit;
-use zephyr::raw::__BindgenBitfieldUnit;
-// ---- `adc_dt_spec` için NEWTYPE SARICI ----
-#[repr(transparent)]
-pub struct AdcDtSpecWrapper(pub raw::adc_dt_spec);
+use crate::raw::adc_dt_spec;
 
-// SAFETY: `adc_dt_spec` thread-safe'dir (dahili değişkenlik yok)
-unsafe impl Sync for AdcDtSpecWrapper {}
+extern crate alloc;
+use alloc::vec::Vec;
 
 #[repr(C)]
 #[derive(PartialEq, Clone, Copy)]
@@ -29,40 +24,22 @@ const fn bit(n: u32) -> u32 {
     1u32 << n
 }
 
-// Statik ADC kanal konfigürasyonu (şablon olarak kullanılır)
-static ADC_CHANNELS_TEMPLATE: &[AdcDtSpecWrapper] = &[
-    AdcDtSpecWrapper(raw::adc_dt_spec {
-        dev: ptr::null(),
-        channel_cfg: raw::adc_channel_cfg {
-            gain: 0,
-            reference: 0,
-            acquisition_time: 0,
-            _bitfield_align_1: [], // Boş bırakılır
-            _bitfield_1: __BindgenBitfieldUnit::new([0b00001010u8; 1]),
-            __bindgen_padding_0: 0, // Padding sıfır  
-        },
-        channel_cfg_dt_node_exists: true,
-        channel_id: 10,
-        oversampling: 0,
-        vref_mv: 3300,
-        resolution: 12,
-    }),
-];
+extern "C" {
+    pub static adc_channels: *const adc_dt_spec;
+    pub static adc_channels_len: usize;
+}
 
-/// Non-blocking dönüşümler için ADC sürücüsü
 pub struct Adc {
     options: raw::adc_sequence_options,
-    channels: [AdcDtSpecWrapper; 1], // Dinamik kopyayı tutar (sabit boyutlu dizi)
     channel_count: usize,
     channel_index: usize,
     isr_context: IsrContext,
 }
 
-/// Kesme işleyici için bağlam
 struct IsrContext {
     work: raw::k_work,
     buffer: i16,
-    sample: [i16; 1],
+    sample: Vec<i16>,
     done_cb: Option<fn(usize, i16)>,
     done_cb_isr: Option<fn(usize, i16)>,
     state: AdcAction,
@@ -71,35 +48,26 @@ struct IsrContext {
 
 impl Adc {
     pub fn new() -> Self {
-        let channel_count = ADC_CHANNELS_TEMPLATE.len();
-        
-        // ADC_CHANNELS_TEMPLATE'in bir kopyasını oluştur
-        let mut channels: [AdcDtSpecWrapper; 1] = unsafe {
-            [ptr::read(&ADC_CHANNELS_TEMPLATE[0])]
-        };
-        
-        // ADC cihazını bağla ve kanalları ayarla
-        for i in 0..channel_count {
-            // Cihazı bağla
-            let dev = unsafe { raw::device_get_binding(c"adc@40012000".as_ptr() as *const core::ffi::c_char) };
-            if dev.is_null() {
-                log::warn!("Failed to bind ADC device for channel #{}\n", i);
-                panic!("ADC device binding failed");
+        let channel_count;
+
+        unsafe {
+            if adc_channels.is_null() {
+                panic!("The adc_channels array from C is NULL!");
             }
-            
-            // Kanal kopyasını güncelle
-            let mut channel_copy = unsafe { ptr::read(&channels[i].0) };
-            channel_copy.dev = dev;
-            
-            // Kanalı ayarla
-            let err = unsafe { raw::adc_channel_setup_dt(&channel_copy) };
-            if err < 0 {
-                log::warn!("Could not setup channel #{} ({})\n", i, err);
-                panic!("ADC channel setup failed");
+
+            channel_count = adc_channels_len;
+
+            // ADC channel setup
+            for i in 0..channel_count {
+                let adc_dt_spec_ptr = adc_channels.add(i);
+                let adc_dt_spec_ref = &*adc_dt_spec_ptr;
+
+                let err = raw::adc_channel_setup_dt(adc_dt_spec_ref);
+                if err < 0 {
+                    log::warn!("Could not setup channel #{} ({})\n", i, err);
+                    panic!("ADC channel setup failed");
+                }
             }
-            
-            // Kopyayı diziye geri yaz
-            channels[i] = AdcDtSpecWrapper(channel_copy);
         }
 
         let mut adc = Adc {
@@ -109,7 +77,7 @@ impl Adc {
                 user_data: ptr::null_mut(),
                 extra_samplings: 0,
             },
-            channels,
+            // channels: Vec::new(), // We no longer create an empty Vec
             channel_count,
             channel_index: 0,
             isr_context: IsrContext {
@@ -122,7 +90,7 @@ impl Adc {
                     flags: 0,
                 },
                 buffer: 0,
-                sample: [0; 1],
+                sample: Vec::with_capacity(channel_count), // Vektörü sınırlandırdık
                 done_cb: None,
                 done_cb_isr: None,
                 state: AdcAction::Continue,
@@ -144,10 +112,10 @@ impl Adc {
 
         let mut sequence = raw::adc_sequence {
             options: &self.options as *const raw::adc_sequence_options,
-            channels: bit(self.channels[0].0.channel_id as u32),
+            channels: unsafe { bit(self.get_channel(0).channel_id as u32) }, // Use get_channel
             buffer: &mut self.isr_context.buffer as *mut i16 as *mut c_void,
             buffer_size: mem::size_of::<i16>(),
-            resolution: self.channels[0].0.resolution,
+            resolution: unsafe { self.get_channel(0).resolution }, // Use get_channel
             calibrate: false,
             oversampling: 0,
         };
@@ -159,7 +127,7 @@ impl Adc {
 
         let res = unsafe {
             raw::adc_read_async(
-                self.channels[0].0.dev,
+                self.get_channel(0).dev, // Use get_channel
                 &sequence as *const raw::adc_sequence,
                 ptr::null_mut(),
             )
@@ -175,10 +143,10 @@ impl Adc {
 
         let mut sequence = raw::adc_sequence {
             options: &self.options as *const raw::adc_sequence_options,
-            channels: bit(self.channels[0].0.channel_id as u32),
+            channels: unsafe { bit(self.get_channel(0).channel_id as u32) }, // Use get_channel
             buffer: &mut self.isr_context.buffer as *mut i16 as *mut c_void,
             buffer_size: mem::size_of::<i16>(),
-            resolution: self.channels[0].0.resolution,
+            resolution: unsafe { self.get_channel(0).resolution }, // Use get_channel
             calibrate: false,
             oversampling: 0,
         };
@@ -190,7 +158,7 @@ impl Adc {
 
         let res = unsafe {
             raw::adc_read_async(
-                self.channels[0].0.dev,
+                self.get_channel(0).dev, // Use get_channel
                 &sequence as *const raw::adc_sequence,
                 ptr::null_mut(),
             )
@@ -208,7 +176,7 @@ impl Adc {
     pub fn get_voltage(&self, idx: usize) -> i32 {
         let mut val_mv = self.isr_context.sample[idx] as i32;
         unsafe {
-            raw::adc_raw_to_millivolts_dt(&self.channels[idx].0, &mut val_mv)
+            raw::adc_raw_to_millivolts_dt(self.get_channel(idx), &mut val_mv) // Use get_channel
         };
         val_mv
     }
@@ -217,28 +185,27 @@ impl Adc {
         self.isr_context.sample[idx] as i32
     }
 
-    /// İş kuyruğu için soft ISR işleyicisi
     extern "C" fn soft_isr(work: *mut raw::k_work) {
         if work.is_null() {
             return;
         }
         let context_ptr = unsafe { container_of(work, |c: &mut IsrContext| &mut c.work) };
-        let context = unsafe { &mut *context_ptr }; // context'i doğru şekilde dereference et
-        let adc = unsafe { &mut *context.adc }; // Şimdi çalışmalı
-    
+        let context = unsafe { &mut *context_ptr };
+        let adc = unsafe { &mut *context.adc };
+
         if adc.channel_count > 1 {
             let mut sequence = raw::adc_sequence {
                 options: &adc.options as *const raw::adc_sequence_options,
-                channels: bit(adc.channels[adc.channel_index].0.channel_id as u32),
+                channels: unsafe { bit(adc.get_channel(adc.channel_index).channel_id as u32) }, // Use get_channel
                 buffer: &mut context.buffer as *mut i16 as *mut c_void,
                 buffer_size: mem::size_of::<i16>(),
-                resolution: adc.channels[adc.channel_index].0.resolution,
+                resolution: unsafe { adc.get_channel(adc.channel_index).resolution }, // Use get_channel
                 calibrate: false,
                 oversampling: 0,
             };
             let res = unsafe {
                 raw::adc_read_async(
-                    adc.channels[adc.channel_index].0.dev,
+                    adc.get_channel(adc.channel_index).dev, // Use get_channel
                     &sequence as *const raw::adc_sequence,
                     ptr::null_mut(),
                 )
@@ -248,7 +215,7 @@ impl Adc {
                 return;
             }
         }
-    
+
         if let Some(cb) = context.done_cb {
             let idx = if adc.channel_index == 0 {
                 adc.channel_count - 1
@@ -259,7 +226,6 @@ impl Adc {
         }
     }
 
-    /// ADC kesmeleri için hard ISR işleyicisi
     extern "C" fn hard_isr(
         _dev: *const raw::device,
         seq: *const raw::adc_sequence,
@@ -279,7 +245,7 @@ impl Adc {
                 if let Some(cb) = context.done_cb_isr {
                     cb(0, context.sample[0]);
                 } else {
-                    unsafe { raw::k_work_submit(&mut context.work); } // Doğru Zephyr fonksiyonunu kullanın
+                    unsafe { raw::k_work_submit(&mut context.work); }
                 }
             } else if adc.channel_index + 1 < adc.channel_count {
                 adc.channel_index += 1;
@@ -287,7 +253,7 @@ impl Adc {
                 if let Some(cb) = context.done_cb_isr {
                     cb(adc.channel_index - 1, context.sample[adc.channel_index - 1]);
                 } else {
-                    unsafe { raw::k_work_submit(&mut context.work); } // Doğru Zephyr fonksiyonunu kullanın
+                    unsafe { raw::k_work_submit(&mut context.work); }
                 }
             } else {
                 if context.state != AdcAction::Repeat {
@@ -299,23 +265,29 @@ impl Adc {
                     if let Some(cb) = context.done_cb_isr {
                         cb(adc.channel_count - 1, context.sample[adc.channel_count - 1]);
                     } else {
-                         unsafe { raw::k_work_submit(&mut context.work); }  // Doğru Zephyr fonksiyonunu kullanın
+                        unsafe { raw::k_work_submit(&mut context.work); }
                     }
                 }
             }
         }
         context.state as raw::adc_action
     }
+
+    // Helper function: Get the channel directly from adc_channels
+    unsafe fn get_channel(&self, index: usize) -> &raw::adc_dt_spec {
+        if index >= self.channel_count {
+            panic!("Channel index out of bounds: {}", index);
+        }
+        &*adc_channels.add(index)
+    }
 }
 
-/// C'nin `container_of` makrosunu, bir alan işaretçisinden üst yapıyı almak için taklit eder
 unsafe fn container_of<T>(
     ptr: *mut raw::k_work,
     f: fn(&mut T) -> &mut raw::k_work,
 ) -> *mut T {
     let offset = {
         let mut dummy = mem::MaybeUninit::<T>::uninit();
-        // Dikkat: Burada dummy'nin mutable referansını alıyoruz
         let dummy_ref: &mut T = &mut *dummy.as_mut_ptr();
         let dummy_ptr = f(dummy_ref) as *const raw::k_work;
         let field_ptr = ptr as *const raw::k_work;
