@@ -73,15 +73,15 @@ async fn main(spawner: Spawner) {
     
     let mut adc = adc_io::Adc::new();
 
-    // adc.read_async(
-    //     core::time::Duration::from_millis(500),
-    //     Some(|idx, value| {
-    //         zephyr::printk!("ADC Channel {}: {}\n", idx, value);
-    //         //unsafe { auxdisplay_clear(LCD_DEVICE) };
-    //         //let msg = format!("ADC {}: {}\n", idx, value);
-    //         //unsafe { auxdisplay_write(LCD_DEVICE, msg.as_ptr(), msg.len().try_into().unwrap()) };            
-    //     }),
-    // );
+    adc.read_async(
+        core::time::Duration::from_millis(500),
+        Some(|idx, value| {
+            zephyr::printk!("ADC Channel {}: {}\n", idx, value);
+            //unsafe { auxdisplay_clear(LCD_DEVICE) };
+            //let msg = format!("ADC {}: {}\n", idx, value);
+            //unsafe { auxdisplay_write(LCD_DEVICE, msg.as_ptr(), msg.len().try_into().unwrap()) };            
+        }),
+    );
 
 
     ////////////////////////////
