@@ -37,7 +37,7 @@ use crate::raw::auxdisplay_write;
 use crate::raw::device_get_binding;
 
 mod button;
-mod encoder;
+// mod encoder;
 mod led;
 mod adc_io;
 //let dev = unsafe { raw::device_get_binding(c"adc@40012000".as_ptr() as *const core::ffi::c_char) };            
@@ -106,12 +106,12 @@ async fn main(spawner: Spawner) {
             button,
             || {
                 log::info!("Button Pressed!");
-                unsafe {
-                    auxdisplay_backlight_set(LCD_DEVICE, {
-                        BL_STATE = !BL_STATE;
-                        BL_STATE as u8
-                    });
-                };
+                // unsafe {
+                //     auxdisplay_backlight_set(LCD_DEVICE, {
+                //         BL_STATE = !BL_STATE;
+                //         BL_STATE as u8
+                //     });
+                //};
 
                 BUTTON_SIGNAL.signal(true);
             }, 
@@ -119,39 +119,39 @@ async fn main(spawner: Spawner) {
         )]
     );
 
-    let encoder_a = zephyr::devicetree::labels::encoder_a::get_instance().unwrap();
-    let encoder_b = zephyr::devicetree::labels::encoder_b::get_instance().unwrap();
+    // let encoder_a = zephyr::devicetree::labels::encoder_a::get_instance().unwrap();
+    // let encoder_b = zephyr::devicetree::labels::encoder_b::get_instance().unwrap();
 
-    declare_encoders!(
-        spawner,
-        gpio_token,
-        [(
-            encoder_a,
-            encoder_b,
-            |clockwise| {
-                let mut value = COUNT.load(Ordering::SeqCst);
-                if clockwise {
-                    value += 1;
-                } else {
-                    value -= 1;
-                }
-                COUNT.store(value, Ordering::Release);
-                ENCODER_SIGNAL.signal(clockwise);
-            },
-            Duration::from_millis(1)
-        )]
-    );
+    // declare_encoders!(
+    //     spawner,
+    //     gpio_token,
+    //     [(
+    //         encoder_a,
+    //         encoder_b,
+    //         |clockwise| {
+    //             let mut value = COUNT.load(Ordering::SeqCst);
+    //             if clockwise {
+    //                 value += 1;
+    //             } else {
+    //                 value -= 1;
+    //             }
+    //             COUNT.store(value, Ordering::Release);
+    //             ENCODER_SIGNAL.signal(clockwise);
+    //         },
+    //         Duration::from_millis(1)
+    //     )]
+    // );
 
-    unsafe {
-        LCD_DEVICE = device_get_binding(c"hd44780".as_ptr() as *const core::ffi::c_char);
-    }
+    // unsafe {
+    //     LCD_DEVICE = device_get_binding(c"hd44780".as_ptr() as *const core::ffi::c_char);
+    // }
 
     loop {
-        unsafe { auxdisplay_clear(LCD_DEVICE) };
+        // unsafe { auxdisplay_clear(LCD_DEVICE) };
 
         let msg = format!("Encoder: {}", COUNT.load(Ordering::SeqCst));
 
-        unsafe { auxdisplay_write(LCD_DEVICE, msg.as_ptr(), msg.len().try_into().unwrap()) };
+        // unsafe { auxdisplay_write(LCD_DEVICE, msg.as_ptr(), msg.len().try_into().unwrap()) };
 
         log::info!("{}", msg);
 
