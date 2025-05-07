@@ -2,30 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 // Coskun ERGAN <coskunergan@gmail.com>
 
-#![no_std]
-
 use core::ffi::c_void;
-use core::ptr;
 use core::time::Duration;
-
-use zephyr::raw;
-use zephyr::raw::{adc_dt_spec, k_work_init, k_work_submit};
-
-#[repr(transparent)]
-struct AdcDtSpec(adc_dt_spec);
-
-#[repr(transparent)]
-struct Device(raw::device);
-
-unsafe impl Sync for AdcDtSpec {}
-unsafe impl Sync for Device {}
+use zephyr::raw::{adc_dt_spec};
 
 extern "C" {
     fn get_adc_channels() -> *const adc_dt_spec;
     fn get_adc_channels_len() -> usize;
     fn adc_new() -> *mut c_void;
-    fn adc_async_read(adc: *mut c_void, interval_us: u32, handler: Option<extern "C" fn(*mut c_void, usize, i16)>, user_data: *mut c_void) -> i32;
-    fn adc_async_read_isr(adc: *mut c_void, interval_us: u32, handler: Option<extern "C" fn(*mut c_void, usize, i16)>, user_data: *mut c_void) -> i32;
+    fn adc_async_read(
+        adc: *mut c_void,
+        interval_us: u32,
+        handler: Option<extern "C" fn(*mut c_void, usize, i16)>,
+        user_data: *mut c_void,
+    ) -> i32;
+    fn adc_async_read_isr(
+        adc: *mut c_void,
+        interval_us: u32,
+        handler: Option<extern "C" fn(*mut c_void, usize, i16)>,
+        user_data: *mut c_void,
+    ) -> i32;
     fn adc_cancel_read(adc: *mut c_void);
     fn adc_get_voltage(adc: *mut c_void, idx: usize) -> i32;
     fn adc_get_value(adc: *mut c_void, idx: usize) -> i32;
@@ -65,7 +61,7 @@ impl Adc {
             done_cb_isr: None,
         }
     }
-
+    #[allow(dead_code)]
     pub fn read_async(&mut self, interval: Duration, handler: Option<fn(usize, i16)>) {
         let interval_us = interval.as_micros() as u32;
         self.done_cb = handler;
@@ -82,7 +78,7 @@ impl Adc {
             panic!("Failed to start async ADC read");
         }
     }
-
+    #[allow(dead_code)]
     pub fn read_async_isr(&mut self, interval: Duration, handler: Option<fn(usize, i16)>) {
         let interval_us = interval.as_micros() as u32;
         self.done_cb_isr = handler;
@@ -99,18 +95,18 @@ impl Adc {
             panic!("Failed to start async ADC read in ISR");
         }
     }
-
+    #[allow(dead_code)]
     pub fn cancel_read(&mut self) {
         unsafe { adc_cancel_read(self.adc_ptr) };
     }
-
+    #[allow(dead_code)]
     pub fn get_voltage(&self, idx: usize) -> i32 {
         if idx >= self.channel_count {
             panic!("Index out of bounds: {}", idx);
         }
         unsafe { adc_get_voltage(self.adc_ptr, idx) }
     }
-
+    #[allow(dead_code)]
     pub fn get_value(&self, idx: usize) -> i32 {
         if idx >= self.channel_count {
             panic!("Index out of bounds: {}", idx);
