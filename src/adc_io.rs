@@ -4,7 +4,15 @@
 
 use core::ffi::c_void;
 use core::time::Duration;
-use zephyr::raw::{adc_dt_spec};
+use zephyr::raw::device;
+
+#[repr(C)]
+pub struct adc_dt_spec {
+    pub dev: *const device,
+    pub channel_id: u32,
+    pub resolution: u8,
+    pub oversampling: u8,
+}
 
 extern "C" {
     fn get_adc_channels() -> *const adc_dt_spec;
