@@ -98,6 +98,7 @@ macro_rules! declare_encoders {
             }
 
             $(
+                use alloc::boxed::Box;
                 let pin_a = $pin_a;
                 let pin_b = $pin_b;
                 let debounce = $debounce;

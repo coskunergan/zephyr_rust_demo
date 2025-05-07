@@ -18,25 +18,23 @@
 
 static const struct device *const dac_dev = DEVICE_DT_GET(DAC_NODE);
 
-static const struct dac_channel_cfg dac_ch_cfg = {
-	.channel_id = DAC_CHANNEL_ID,
-	.resolution = DAC_RESOLUTION,
-	.buffered = true
+static const struct dac_channel_cfg dac_ch_cfg =
+{
+    .channel_id = DAC_CHANNEL_ID,
+    .resolution = DAC_RESOLUTION,
+    .buffered = true
 };
 
-int dac_init(void) {
-	if (!device_is_ready(dac_dev)) {
-		return -ENODEV;
-	}
-
-	int ret = dac_channel_setup(dac_dev, &dac_ch_cfg);
-	if (ret != 0) {
-		return ret;
-	}
-
-	return 0;
+int dac_init(void)
+{
+    if(!device_is_ready(dac_dev))
+    {
+        return -ENODEV;
+    }
+    return dac_channel_setup(dac_dev, &dac_ch_cfg);
 }
 
-int dac_write(int32_t value) {
-	return dac_write_value(dac_dev, DAC_CHANNEL_ID, value);
+int dac_write(int32_t value)
+{
+    return dac_write_value(dac_dev, DAC_CHANNEL_ID, value);
 }

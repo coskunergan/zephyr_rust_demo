@@ -82,6 +82,7 @@ macro_rules! declare_buttons {
             }
 
             $(
+                use alloc::boxed::Box;
                 let pin = $pin;
                 let debounce = $debounce;
                 let button = $crate::button::Button::new($token.clone(), pin, Box::new($closure), debounce);
