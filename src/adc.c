@@ -259,7 +259,7 @@ static enum adc_action adc_hard_isr(const struct device *dev, const struct adc_s
 		} else {
 			if (context->state != ADC_ACTION_REPEAT) {
 				context->state = ADC_ACTION_REPEAT;
-				adc->channel_index = 0;
+				adc->channel_index--;
 			} else {
 				context->state = ADC_ACTION_CONTINUE;
 				adc->channel_index = 0;
